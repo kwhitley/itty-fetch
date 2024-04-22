@@ -7,7 +7,7 @@ import copy from 'rollup-plugin-copy'
 
 // scan files to build
 const files = (await globby('./src/*.ts', {
-  ignore: ['**/*.spec.ts', 'example'],
+  ignore: ['**/*.spec.ts'],
 })).map(path => ({
   path,
   shortPath: path.replace(/(\/src)|(\.ts)/g, '').replace('./index', '.'),
@@ -36,22 +36,23 @@ await fs.writeJSON('./package.json', pkg, { spaces: 2 })
 export default async () => {
   console.log(files.map(f => f.path))
 
+  // export base files
   return files.map(file => ({
     input: file.path,
     output: [
       {
         format: 'esm',
         file: file.esm,
-        sourcemap: false,
+        sourcemap: true,
       },
       {
         format: 'cjs',
         file: file.cjs,
-        sourcemap: false,
+        sourcemap: true,
       },
     ],
     plugins: [
-      typescript({ sourceMap: false }),
+      typescript({ sourceMap: true }),
       terser(),
       bundleSize(),
       copy({

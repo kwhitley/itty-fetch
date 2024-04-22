@@ -6,10 +6,20 @@
   "module": "./index.mjs",
   "types": "./index.d.ts",
   "exports": {
-    ".": {
-      "import": "./index.mjs",
-      "require": "./index.js",
-      "types": "./index.d.ts"
+    "./fetcher": {
+      "import": "./fetcher.mjs",
+      "require": "./fetcher.js",
+      "types": "./fetcher.d.ts"
+    },
+    "./proxy1": {
+      "import": "./proxy1.mjs",
+      "require": "./proxy1.js",
+      "types": "./proxy1.d.ts"
+    },
+    "./proxy2": {
+      "import": "./proxy2.mjs",
+      "require": "./proxy2.js",
+      "types": "./proxy2.d.ts"
     }
   },
   "scripts": {
