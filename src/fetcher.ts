@@ -6,23 +6,26 @@ type Options = {
 const createEnhancedFunction = ({
   base = '',
   fetch = () => {},
+  ...other
 }: Options = {}) => new Proxy((o: any) => createEnhancedFunction(o), {
   get(obj: any, prop: any) {
     return obj[prop]
       ?? (
         (...args: any) => {
-          // console.log('calling method', prop, 'with args', args)
-          // console.log('typeof args[0]', typeof args[0])
+          // extract base
           base = base + (
             typeof args[0] == 'string'
               ? args.shift()
               : ''
           )
-          // console.log({
-          //   base,
-          //   fetch,
-          // })
-          return fetch(base, ...args)
+
+          const payload = args.shift(),
+                options = args.shift()
+
+          return fetch(base, {
+            ...other,
+            ...options,
+          })
         }
       )
   }

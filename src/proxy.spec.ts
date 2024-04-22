@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { proxy as proxy1 } from './proxy1'
-import { proxy as proxy2 } from './proxy2'
+// import { proxy as proxy2 } from './proxy2'
 
 const functions = { proxy1 }
 
