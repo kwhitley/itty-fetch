@@ -1,52 +1,69 @@
-type Options = {
-  base?: string
+type ResponseHandler = (response?: Response, request?: Request) => Promise<Response | void>
+
+type FetcherOptions = {
+  base?: string | URL
   fetch?: Function
-  headers?: Headers | Record<string, any>
+  parse?: boolean
+  encode?: boolean
+  after?: ResponseHandler[]
+} & RequestInit & Record<string, any>
+
+type GetFetchCall = {
+  (url?: string, options?: FetcherOptions): Promise<any>
+  (options?: FetcherOptions): Promise<any>
 }
 
-type FetchCallOptions = {
-  parse?: false | Function
-  encode?: false | Function
-  body?: any
-} & RequestInit
+type FetchCall = {
+  (url?: string, payload?: any, options?: FetcherOptions): Promise<any>
+  (payload?: any, options?: FetcherOptions): Promise<any>
+}
 
-type FetchCall = (url: string, payload: any, options: FetchCallOptions) => Promise<any>
+type Fetcher = {
+  (options?: FetcherOptions): Fetcher
+  get: GetFetchCall
+  post: FetchCall
+  put: FetchCall
+  patch: FetchCall
+  delete: FetchCall
+}
 
 const createEnhancedFunction = ({
   base = window?.location?.origin ?? '',
   fetch = () => {},
   headers = {},
   ...options
-}: Options = {}) => new Proxy((o: any) => createEnhancedFunction(o), {
+}: FetcherOptions = {}): Fetcher => new Proxy((o: any) => createEnhancedFunction(o), {
   get(obj: any, method: any) {
     return obj[method]
       ?? (
-        (...args: any): FetchCall => {
+        async (...args: any) => {
           // extract base
-          base = base + (
+          base = new URL(base + (
             typeof args[0] == 'string'
               ? args.shift()
               : ''
-          )
+          ))
 
           // extract payload
-          let payload = args.shift()
+          if (method != 'get')
+            var payload = args.shift()
 
+          // set method on request
           options.method = method
-
 
           // created blended options
           options = { ...options, ...args.shift() }
 
           // turn base headers into actual headers instance
-          // headers = new Headers(headers)
+          headers = new Headers(headers)
 
           const {
-            parse = (r: any) => r.json(),
-            // encode = JSON.stringify,
-          } = options as FetchCallOptions
+            parse = true,
+            encode = true,
+            after = [],
+          } = options as FetcherOptions
 
-          if (payload) {
+          if (payload && encode) {
             if (typeof payload != 'string') {
               payload = JSON.stringify(payload)
               headers.set('content-type', 'application/json')
@@ -57,25 +74,33 @@ const createEnhancedFunction = ({
           // create request
           const request = new Request(base, options)
 
-          // add base
-          // for (const [key, value] of headers.entries()) {
-          //   request.headers.set(key, value)
-          // }
-
           // append any headers
           for (const [key, value] of [...new Headers(headers).entries(), ...request.headers.entries()]) {
             request.headers.set(key, value)
           }
 
-          // console.log('request headers are', [...request.headers.entries()])
+          let response = await fetch(request)
 
-          let fetchCall = fetch(request)
-
-          if (parse) {
-            fetchCall = fetchCall.then(parse)
+          // result = await result.then((r: Response) => {
+          if (!response.ok) {
+            const err = new Error(response.statusText)
+            // @ts-ignore
+            err.status = r.status
+            throw err
           }
 
-          return fetchCall
+          if (parse) {
+            response = await (response.headers.get('content-type')?.includes('json')
+              ? response.json()
+              : response.text()
+            )
+          }
+
+          for (const handler of after) {
+            response = await handler(response, request) ?? response
+          }
+
+          return response
         }
       )
   }
@@ -84,4 +109,8 @@ const createEnhancedFunction = ({
 export const fetcher = createEnhancedFunction()
 
 
-// fetcher({ base: 'test' })
+// fetcher({
+//   after: [
+//     (r => r.json())
+//   ]
+// }).get()

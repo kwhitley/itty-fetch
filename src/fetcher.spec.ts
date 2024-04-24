@@ -7,14 +7,16 @@ const STRINGIFIED_OBJECT = JSON.stringify(OBJECT)
 const fetch = (spy) => (request) => {
   spy(request)
 
-  return Promise.resolve(new Response(STRINGIFIED_OBJECT))
+  return Promise.resolve(new Response(STRINGIFIED_OBJECT, {
+    headers: { 'content-type': 'application/json' }
+  }))
 }
 
 describe('fetcher', () => {
   it('fetcher.post() => calls a request with method POST', async () => {
     const spy = vi.fn(r => r.method)
 
-    const response = await fetcher({ fetch: fetch(spy) }).post()
+    const response = await fetcher({ fetch: fetch(spy) }).post(OBJECT)
     expect(spy).toHaveReturnedWith('POST')
     expect(response).toEqual(OBJECT)
   })
@@ -61,7 +63,7 @@ describe('fetcher', () => {
       base: 'https:foo.bar',
       fetch: fetch(spy),
       headers: { foo: 'bar', cat: 'dog' },
-    }).get('/cats', null, {
+    }).get('/cats', {
       headers: { foo: 'baz' }
     })
     expect(spy).toHaveReturnedWith([
@@ -70,21 +72,23 @@ describe('fetcher', () => {
     ])
   })
 
-  // it('fetcher(options).post() => will call fetcher with options', async () => {
-  //   const fetch = vi.fn((_, options) => options)
-  //   await fetcher({ fetch, id: 3 }).post()
-  //   expect(fetch).toHaveReturnedWith({ id: 3 })
-  // })
+  it('fetcher({ headers }).get({ headers }) => blends base headers with final ones', async () => {
+    const spy = vi.fn(r => r.url)
 
-  // it('fetcher(options1).post(options2) => will call fetcher with options2', async () => {
-  //   const fetch = vi.fn((_, options) => options)
-  //   await fetcher({ fetch }).post(null, { id: 3 })
-  //   expect(fetch).toHaveReturnedWith({ id: 3 })
-  // })
+    await fetcher({
+      base: 'https:foo.bar',
+      fetch: fetch(spy),
+    }).get()
+    expect(spy).toHaveReturnedWith('https://foo.bar/')
+  })
 
-  // it('fetcher(options1).post(options2) => will blend options', async () => {
-  //   const fetch = vi.fn((_, options) => options)
-  //   await fetcher({ fetch, foo: 'bar' }).post(null, { id: 3 })
-  //   expect(fetch).toHaveReturnedWith({ foo: 'bar', id: 3 })
-  // })
+  it('fetcher({ headers }).get({ headers }) => blends base headers with final ones', async () => {
+    const spy = vi.fn(async r => await r.json())
+
+    await fetcher({
+      base: 'https:foo.bar',
+      fetch: fetch(spy),
+    }).post(OBJECT)
+    expect(spy).toHaveReturnedWith(OBJECT)
+  })
 })
