@@ -3,6 +3,7 @@ import { fetcher } from './fetcher'
 
 const OBJECT = { foo: 'bar' }
 const STRINGIFIED_OBJECT = JSON.stringify(OBJECT)
+const TEXT = 'FooBarBaz'
 
 const fetch = (spy) => (request) => {
   spy(request)
@@ -10,6 +11,12 @@ const fetch = (spy) => (request) => {
   return Promise.resolve(new Response(STRINGIFIED_OBJECT, {
     headers: { 'content-type': 'application/json' }
   }))
+}
+
+const fetchText = (spy) => (request) => {
+  spy(request)
+
+  return Promise.resolve(new Response(TEXT))
 }
 
 describe('fetcher', () => {
@@ -32,11 +39,25 @@ describe('fetcher', () => {
     const spy = vi.fn(r => r.headers.get('foo'))
 
     await fetcher({
-      base: 'https:foo.bar',
+      base: 'https://foo.bar',
       fetch: fetch(spy),
       headers: { foo: 'bar' },
     }).get('/cats')
     expect(spy).toHaveReturnedWith('bar')
+  })
+
+  it('fetcher({ query: {} }).get({ query: {} }) => appends query to request', async () => {
+    const spy = vi.fn(r => {
+      let url = new URL(r.url)
+
+      return Object.fromEntries(url.searchParams.entries())
+    })
+
+    await fetcher({
+      base: 'https://foo.bar?foo=bar',
+      fetch: fetch(spy),
+    }).get({ query: { page: 2 }})
+    expect(spy).toHaveReturnedWith({ foo: 'bar', page: '2' })
   })
 
   it('fetcher({ headers: {} }).get() => appends headers to request', async () => {

@@ -61,7 +61,11 @@ const createEnhancedFunction = ({
             parse = true,
             encode = true,
             after = [],
+            query = {},
           } = options as FetcherOptions
+
+          // @ts-ignore
+          Object.entries(query).forEach(([k, v]) => base.searchParams.append(k, v))
 
           if (payload && encode) {
             if (typeof payload != 'string') {
@@ -72,20 +76,20 @@ const createEnhancedFunction = ({
           }
 
           // create request
-          const request = new Request(base, options)
+          var request = new Request(base, options)
 
           // append any headers
           for (const [key, value] of [...new Headers(headers).entries(), ...request.headers.entries()]) {
             request.headers.set(key, value)
           }
 
-          let response = await fetch(request)
+          var response = await fetch(request)
 
-          // result = await result.then((r: Response) => {
+          // throw on error
           if (!response.ok) {
             const err = new Error(response.statusText)
             // @ts-ignore
-            err.status = r.status
+            err.status = response.status
             throw err
           }
 
