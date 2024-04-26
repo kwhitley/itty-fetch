@@ -2,7 +2,7 @@ type ResponseHandler = (response?: Response, request?: Request) => Promise<Respo
 
 type FetcherOptions = {
   base?: string | URL
-  fetch?: Function
+  fetch?: typeof fetch
   parse?: boolean
   encode?: boolean
   after?: ResponseHandler[]
@@ -29,7 +29,6 @@ type Fetcher = {
 
 const createEnhancedFunction = ({
   base = window?.location?.origin ?? '',
-  fetch = () => {},
   headers = {},
   ...options
 }: FetcherOptions = {}): Fetcher => new Proxy((o: any) => createEnhancedFunction(o), {
@@ -38,21 +37,17 @@ const createEnhancedFunction = ({
       ?? (
         async (...args: any) => {
           // extract base
-          base = new URL(base + (
-            typeof args[0] == 'string'
-              ? args.shift()
-              : ''
-          ))
+          let childBase = typeof args[0] == 'string'
+          ? args.shift()
+          : ''
+          var url = new URL(childBase.indexOf('http') == -1 ? base + childBase : childBase)
 
           // extract payload
           if (method != 'get')
             var payload = args.shift()
 
-          // set method on request
-          options.method = method
-
-          // created blended options
-          options = { ...options, ...args.shift() }
+          // created locally-scoped blended options
+          options = { ...options, ...args.shift(), method }
 
           // turn base headers into actual headers instance
           headers = new Headers(headers)
@@ -60,12 +55,13 @@ const createEnhancedFunction = ({
           const {
             parse = true,
             encode = true,
+            onError,
             after = [],
             query = {},
           } = options as FetcherOptions
 
           // @ts-ignore
-          Object.entries(query).forEach(([k, v]) => base.searchParams.append(k, v))
+          Object.entries(query).forEach(([k, v]) => url.searchParams.append(k, v))
 
           if (payload && encode) {
             if (typeof payload != 'string') {
@@ -76,21 +72,21 @@ const createEnhancedFunction = ({
           }
 
           // create request
-          var request = new Request(base, options)
+          var request = new Request(url, options)
 
           // append any headers
           for (const [key, value] of [...new Headers(headers).entries(), ...request.headers.entries()]) {
             request.headers.set(key, value)
           }
 
-          var response = await fetch(request)
+          var response = await (options.fetch ?? fetch)(request), error
 
           // throw on error
           if (!response.ok) {
-            const err = new Error(response.statusText)
+            error = new Error(response.statusText)
             // @ts-ignore
-            err.status = response.status
-            throw err
+            error.status = response.status
+            // throw err
           }
 
           if (parse) {
@@ -98,6 +94,13 @@ const createEnhancedFunction = ({
               ? response.json()
               : response.text()
             )
+          }
+
+          if (error) {
+            if (onError)
+              onError(error, response)
+            else
+              throw error
           }
 
           for (const handler of after) {
@@ -111,10 +114,3 @@ const createEnhancedFunction = ({
 })
 
 export const fetcher = createEnhancedFunction()
-
-
-// fetcher({
-//   after: [
-//     (r => r.json())
-//   ]
-// }).get()
