@@ -79,14 +79,14 @@ const createEnhancedFunction = ({
             request.headers.set(key, value)
           }
 
-          var response = await (options.fetch ?? fetch)(request), error
+          var error, response = await (options.fetch ?? fetch)(request)
 
           // throw on error
           if (!response.ok) {
             error = new Error(response.statusText)
             // @ts-ignore
             error.status = response.status
-            // throw err
+            // throw error
           }
 
           if (parse) {
@@ -98,7 +98,7 @@ const createEnhancedFunction = ({
 
           if (error) {
             if (onError)
-              onError(error, response)
+              return await onError(error, response)
             else
               throw error
           }
