@@ -4,27 +4,23 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": "src",
     "declaration": true,
+    "sourceMap": true,
     "esModuleInterop": true,
     "inlineSourceMap": false,
-    "lib": [
-      "esnext",
-      "dom"
-    ],
+    "lib": ["esnext", "dom", "dom.iterable"],
     "listEmittedFiles": false,
     "listFiles": false,
-    "moduleResolution": "nodeNext",
     "noFallthroughCasesInSwitch": true,
     "pretty": true,
-    "resolveJsonModule": true,
     "rootDir": "src",
     "skipLibCheck": true,
-    "strict": false,
-    "sourceMap": false,
+    "strict": true,
     "traceResolution": false,
-    "module": "esnext",
     "outDir": "",
-    "target": "esnext"
+    "target": "esnext",
+    "module": "esnext",
+    "types": ["@types/node"]
   },
-  "exclude": ["node_modules", "dist", "**/*.spec.ts"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "examples"],
   "include": ["src"]
 }
