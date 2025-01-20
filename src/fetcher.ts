@@ -1,6 +1,7 @@
 type ResponseHandler = (response?: Response, request?: Request) => Promise<Response | void>
 
-type FetcherOptions = {
+// Update FetcherOptions to be more specific about what it accepts
+type FetcherOptionsObject = {
   base?: string | URL
   fetch?: typeof fetch
   parse?: boolean
@@ -8,18 +9,21 @@ type FetcherOptions = {
   after?: ResponseHandler[]
 } & RequestInit & Record<string, any>
 
+// Create a union type for all possible arguments
+type FetcherOptions = string | FetcherOptionsObject
+
 type GetFetchCall = {
-  (url?: string, options?: FetcherOptions): Promise<any>
-  (options?: FetcherOptions): Promise<any>
+  (url?: string, options?: FetcherOptionsObject): Promise<any>
+  (options?: FetcherOptionsObject): Promise<any>
 }
 
 type FetchCall = {
-  (url?: string, payload?: any, options?: FetcherOptions): Promise<any>
-  (payload?: any, options?: FetcherOptions): Promise<any>
+  (url?: string, payload?: any, options?: FetcherOptionsObject): Promise<any>
+  (payload?: any, options?: FetcherOptionsObject): Promise<any>
 }
 
 type Fetcher = {
-  (options?: FetcherOptions): Fetcher
+  (options?: FetcherOptions, additionalOptions?: FetcherOptionsObject): Fetcher
   get: GetFetchCall
   post: FetchCall
   put: FetchCall
@@ -27,90 +31,77 @@ type Fetcher = {
   delete: FetchCall
 }
 
-const createEnhancedFunction = ({
-  base = window?.location?.origin ?? '',
-  headers = {},
-  ...options
-}: FetcherOptions = {}): Fetcher => new Proxy((o: any) => createEnhancedFunction(o), {
-  get(obj: any, method: any) {
-    return obj[method]
-      ?? (
-        async (...args: any) => {
-          // extract base
-          let childBase = typeof args[0] == 'string'
-          ? args.shift()
-          : ''
-          var url = new URL(childBase.indexOf('http') == -1 ? base + childBase : childBase)
+// Extract handler logic for better minification
+const handleRequest = async (
+  method: string, 
+  args: any[], 
+  options: FetcherOptionsObject, 
+  base: string, 
+  headers: HeadersInit
+) => {
+  // console.log({ method, args, options, base, headers })
+  let childBase = typeof args[0] == 'string' ? args.shift() : ''
+  let payload = method != 'get' ? args.shift() : null
+  
+  options = { ...options, ...args.shift(), method }
+  headers = new Headers(headers)
+  // console.log('base headers', Object.fromEntries(headers))
+  // console.log('request headers', Object.fromEntries(new Headers(options.headers ?? [])))
+  let url = new URL(childBase.indexOf('http') == -1 ? base + childBase : childBase)
 
-          // extract payload
-          if (method != 'get')
-            var payload = args.shift()
+  // @ts-ignore - combine query params
+  Object.entries(options.query || {}).forEach(([k, v]) => url.searchParams.append(k, v))
 
-          // created locally-scoped blended options
-          options = { ...options, ...args.shift(), method }
-
-          // turn base headers into actual headers instance
-          headers = new Headers(headers)
-
-          const {
-            parse = true,
-            encode = true,
-            onError,
-            after = [],
-            query = {},
-          } = options as FetcherOptions
-
-          // @ts-ignore
-          Object.entries(query).forEach(([k, v]) => url.searchParams.append(k, v))
-
-          if (payload && encode) {
-            if (typeof payload != 'string') {
-              payload = JSON.stringify(payload)
-              headers.set('content-type', 'application/json')
-            }
-            options.body = payload
-          }
-
-          // create request
-          var request = new Request(url, options)
-
-          // append any headers
-          for (const [key, value] of [...new Headers(headers).entries(), ...request.headers.entries()]) {
-            request.headers.set(key, value)
-          }
-
-          var error, response = await (options.fetch ?? fetch)(request)
-
-          // throw on error
-          if (!response.ok) {
-            error = new Error(response.statusText)
-            // @ts-ignore
-            error.status = response.status
-            // throw error
-          }
-
-          if (parse) {
-            response = await (response.headers.get('content-type')?.includes('json')
-              ? response.json()
-              : response.text()
-            )
-          }
-
-          if (error) {
-            if (onError)
-              return await onError(error, response)
-            else
-              throw error
-          }
-
-          for (const handler of after) {
-            response = await handler(response, request) ?? response
-          }
-
-          return response
-        }
-      )
+  // Handle payload
+  if (payload && options.encode !== false) {
+    options.body = typeof payload == 'string' ? payload : JSON.stringify(payload)
+    // @ts-ignore - set content-type
+    !typeof payload == 'string' && headers.set('content-type', 'application/json')
   }
-})
+
+  for (let [k, v] of [...new Headers(options.headers ?? [])]) {
+    headers.set(k, v)
+  }
+  options.headers = headers
+  let request = new Request(url, options)
+  // console.log({ request, options})
+  // console.log('final headers', Object.fromEntries(options.headers))
+
+  let error, response = await (options.fetch ?? fetch)(request)
+
+  if (!response.ok) {
+    error = Object.assign(new Error(response.statusText), { status: response.status })
+  }
+
+  options.parse !== false && (response = await (response.headers.get('content-type')?.includes('json')
+    ? response.json()
+    : response.text()))
+
+  if (error) return options.onError ? options.onError(error, response) : Promise.reject(error)
+
+  for (let handler of options.after || []) {
+    response = await handler(response, request) ?? response
+  }
+
+  return response
+}
+
+const createEnhancedFunction = (
+  optionsOrBase?: FetcherOptions, 
+  additionalOptions?: FetcherOptionsObject,
+  options = typeof optionsOrBase == 'string'
+    ? { base: optionsOrBase, ...additionalOptions }
+    : optionsOrBase || {},
+  { 
+    base = window?.location?.origin ?? '', 
+    headers = {}, 
+    ...restOptions 
+  } = options
+): Fetcher =>
+  // @ts-ignore
+  new Proxy((...args: any) => createEnhancedFunction(...args), {
+    // @ts-ignore
+    get: (obj, method: any) => obj[method] ?? ((...args) => handleRequest(method, args, restOptions, base, headers))
+  })
 
 export const fetcher = createEnhancedFunction()

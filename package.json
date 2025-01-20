@@ -15,13 +15,18 @@
       "import": "./fetcher.mjs",
       "require": "./fetcher.js",
       "types": "./fetcher.d.ts"
+    },
+    "./test-utils": {
+      "import": "./test-utils.mjs",
+      "require": "./test-utils.js",
+      "types": "./test-utils.d.ts"
     }
   },
   "scripts": {
     "lint": "eslint src",
     "test": "vitest --coverage --reporter verbose",
     "test:once": "vitest run",
-    "dev": "run-p dev:lint test",
+    "dev": "run-p test",
     "dev:lint": "onchange -ik 'src/**/*.ts' -- yarn lint",
     "coverage": "vitest run --coverage",
     "coveralls": "yarn coverage && cat ./coverage/lcov.info | coveralls",

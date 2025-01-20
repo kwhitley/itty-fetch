@@ -5,14 +5,6 @@ const OBJECT = { foo: 'bar' }
 const STRINGIFIED_OBJECT = JSON.stringify(OBJECT)
 const TEXT = 'FooBarBaz'
 
-const SCENARIOS = [
-  {
-    label: 'can set headers using object notation on fetcher()',
-    args1: [{ headers: { foo: 'bar' }}],
-
-  }
-]
-
 const withSpies = (...spies) => (request) => {
   for (const spy of spies) {
     spy(request)
@@ -23,10 +15,10 @@ const withSpies = (...spies) => (request) => {
   }))
 }
 
-const return404 = (request) =>
+const return404 = () =>
   Promise.resolve(new Response(null, { status: 404 }))
 
-const return404WithBody = (request) =>
+const return404WithBody = () =>
   Promise.resolve(new Response(JSON.stringify({ status: 404, error: 'Are you sure about that?' }), {
     headers: { 'content-type': 'application/json' },
     status: 404,
